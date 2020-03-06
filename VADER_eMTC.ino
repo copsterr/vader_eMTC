@@ -14,6 +14,11 @@ void setup() {
   if (requestIMEI() != 0) Serial.println("Cannot Request IMEI.");
   if (setPhoneFunc(1) == 0) Serial.println("Set phone completed.");
   if (signalQualityReport() != 0) Serial.println("ERROR Cannot Read Signal Quality");
+  if (cgatt(1) == 0) Serial.println("cgatt ok.");
+  if (showPdpAddr() == 0) Serial.println("PDP ADDR ok.");
+  if (configTCPcontext(1, 1, "aistest.emtc", "", "", 0) == 0) Serial.println("config TCP context ok.");
+  if (deactivatePDP(1) == 0) Serial.println("PDP deactivated.");
+  if (activatePDP(1, 1, 1) == 0) Serial.println("PDP activated.");
 }
 
 void loop() {
@@ -137,7 +142,7 @@ int8_t signalQualityReport(void) {
   return -1;
 }
 
-int8_t cgatt(unit8_t mode) {
+int8_t cgatt(uint8_t mode) {
   String resp = "";
   char char_mode = '1';
   
@@ -156,7 +161,7 @@ int8_t cgatt(unit8_t mode) {
   mySerial.write("\r\n");
   mySerial.flush();
 
-  mySerail.readStringUntil('\n'); //read echo
+  mySerial.readStringUntil('\n'); //read echo
   resp = mySerial.readString();
 
   if (resp.equals("OK\r\n")) {
@@ -213,8 +218,8 @@ int8_t configTCPcontext(uint8_t contextID, uint8_t contextType, String APN, Stri
     payload += String(contextType) + ",";
     
   payload += "\"" + APN + "\","; // add APN name
-  payload += "\"" + username + "\"," // add username
-  payload += "\"" + password + "\"," // add password
+  payload += "\"" + username + "\","; // add username
+  payload += "\"" + password + "\","; // add password
 
   // check authentication
   if (authen < 0 || authen > 3)
@@ -223,7 +228,7 @@ int8_t configTCPcontext(uint8_t contextID, uint8_t contextType, String APN, Stri
     payload += String(authen) + "\r\n";
 
 
-  mySerial.write(payload);
+  mySerial.print(payload);
   mySerial.flush();
 
   mySerial.readStringUntil('\n'); // read echo
@@ -236,7 +241,28 @@ int8_t configTCPcontext(uint8_t contextID, uint8_t contextType, String APN, Stri
   return -1;
 }
 
-int8_t activatePDP(uint8_t contextID, uint8_t contextState, uint8_t contextType, String IPAddr) {
+int8_t deactivatePDP(uint8_t contextID) {
+  String payload = "AT+QIDEACT=";
+  String resp    = "";
+
+  if (contextID < 1 || contextID > 16)
+    return -1;
+  else
+    payload += String(contextID) + "\r\n";
+
+  mySerial.print(payload);
+  mySerial.flush();
+
+  mySerial.readStringUntil('\n'); // read echo
+  resp = mySerial.readString();
+
+  if (resp.equals("OK\r\n"))
+    return 0;
+  
+  return -1;
+}
+
+int8_t activatePDP(uint8_t contextID, uint8_t contextState, uint8_t contextType) {
   String resp = "";
   String payload = "AT+QIACT=";
   
@@ -245,8 +271,30 @@ int8_t activatePDP(uint8_t contextID, uint8_t contextState, uint8_t contextType,
   if (contextID < 1 || contextID > 16)
     return -1;
   else
-    payload += String(context) + ",";
+    payload += String(contextID) + ",";
   
+  // check context state
+  if (contextState < 0 || contextState > 1)
+    return -1;
+  else
+    payload += String(contextState) + ",";
 
-  
+
+  if (contextType < 1 || contextType > 2)
+    return -1;
+  else
+    payload += String(contextType) + "\r\n";
+
+    
+  mySerial.print(payload);
+  mySerial.flush();
+
+  mySerial.readStringUntil('\n'); // read echo
+  resp = mySerial.readString(); // read response
+
+  if (resp.equals("OK\r\n")) {
+    return 0;
+  }
+
+  return -1;
 }
