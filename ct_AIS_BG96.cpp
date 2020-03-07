@@ -11,12 +11,59 @@ void printSerialDebug(void) {
   }
 }
 
-/* General Commands ----------------- */
+/* HIGH LEVEL FUNCTIONS */
 int8_t initModule(void) {
+  uint8_t ret = 0;
+  
   mySerial.begin(9600);
   mySerial.setTimeout(1000);
+
+  if (checkModule() != 0) ret = -1;
+  if (configEcho() != 0) ret = -1;
+  if (requestIMEI() != 0) ret = -1;
+  if (setPhoneFunc() != 0) ret = -1;
+  if (signalQualityReport() != 0) ret = -1;
+  if (cgatt(1) != 0) ret = -1;
+  if (showPdpAddr() != 0) ret = -1;
+  
+  if (ret == -1) {
+    #if CT_BG96_DEBUG
+      Serial.println("Error! Cannot init Module!");
+    #endif
+    return ret;
+  }
+  
+  #if CT_BG96_DEBUG
+    Serial.println("AIS eMTC BG96 Module successfully initialized.");
+  #endif
+
+  return ret;
 }
 
+int8_t openConnection(String APN, String serviceType, String ipAddr, uint16_t port) {
+  uint8_t ret = 0;
+
+  if (configTCPcontext(APN) != 0) ret = -1;
+  if (deactivatePDP() != 0) ret = -1;
+  if (activatePDP() != 0) ret = -1;
+  if (openSocketService(serviceType, ipAddr, port) != 0) ret = -1;
+  
+  if (ret == -1) {
+    #if CT_BG96_DEBUG
+      Serial.println("Error! Cannot open connection!");
+    #endif
+    return ret;
+  }
+
+  #if CT_BG96_DEBUG
+    Serial.println("Socket Opened Successfully.");
+  #endif
+  return 0;
+}
+
+
+/* LOW LEVEL FUNCTIONS */
+/* General Commands ----------------- */
 int8_t checkModule(void) {
   String resp = "";
   
@@ -26,6 +73,11 @@ int8_t checkModule(void) {
   resp = mySerial.readStringUntil('\n'); // read response
   
   if (resp.equals("OK\r") == true) {
+
+    #if CT_BG96_DEBUG
+      Serial.println("Module OK.");
+    #endif
+
     return 0; // success
   }
 
@@ -36,8 +88,10 @@ int8_t configEcho(uint8_t mode=0) {
   String resp    = "";
   String payload = "ATE";
 
-  if (mode != 0 || mode != 1) {
-    Serial.println("Cannot set Echo. Invalid Parameter");
+  if (mode < 0 || mode > 1) {
+    #if CT_BG96_DEBUG
+      Serial.println("Cannot set Echo. Invalid Parameter");
+    #endif
     return -1;
   }
   payload += String(mode) + "\r\n";
@@ -70,14 +124,16 @@ int8_t requestIMEI(void) {
   resp = mySerial.readString(); // read response
   
   if (resp.equals("\n\r\nOK\r\n") == true) {
-      Serial.print("IMEI -> "); Serial.println(imei);
+      #if CT_BG96_DEBUG
+        Serial.print("IMEI -> "); Serial.println(imei);
+      #endif
       return 0;
   }
   
   return -1;
 }
 
-int8_t setPhoneFunc(uint8_t mode) {
+int8_t setPhoneFunc(uint8_t mode=1) {
   String resp = "";
   char char_mode = 0;
 
@@ -103,6 +159,9 @@ int8_t setPhoneFunc(uint8_t mode) {
   resp = mySerial.readString(); // read response
   
   if (resp.equals("OK\r\n") == true) {
+    #if CT_BG96_DEBUG
+      Serial.println("Phone functionality successfully set.");
+    #endif
     return 0;
   }
 
@@ -140,8 +199,11 @@ int8_t signalQualityReport(void) {
       rssi = "Not known or Undetectable";
     }
 
-    Serial.print("rssi -> "); Serial.print(rssi); Serial.print(" dBm");
-    Serial.print(", channel ber(%) -> "); Serial.println(ber); 
+    #if CT_BG96_DEBUG
+      Serial.print("rssi -> "); Serial.print(rssi); Serial.print(" dBm");
+      Serial.print(", channel ber(%) -> "); Serial.println(ber); 
+    #endif
+
     return 0;
   }
 
@@ -150,29 +212,32 @@ int8_t signalQualityReport(void) {
 
 int8_t cgatt(uint8_t mode) {
   String resp = "";
-  char char_mode = '1';
+  String payload = "AT+CGATT=";
   
-  if (mode == 0) {
-    char_mode = '0';
-  }
-  else if (mode == 1) {
-    char_mode = '1';
-  }
-  else {
+  if (mode < 0 || mode > 1) {
+    #if CT_BG96_DEBUG
+      Serial.println("CGATT failed. Invalid Parameter");
+    #endif
     return -1;
   }
-
-  mySerial.write("AT+CGATT:");
-  mySerial.write(char_mode);
-  mySerial.write("\r\n");
+  payload += String(mode) + "\r\n";
+  
+  mySerial.print(payload);
   mySerial.flush();
 
   mySerial.readStringUntil('\n'); //read echo
   resp = mySerial.readString();
 
   if (resp.equals("OK\r\n")) {
+    #if CT_BG96_DEBUG
+      Serial.println("CGATT OK.");
+    #endif
     return 0;
   }
+
+  #if CT_BG96_DEBUG
+    Serial.println("CGATT FAILED.");
+  #endif
 
   return -1;
 }
@@ -197,7 +262,9 @@ int8_t showPdpAddr(void) {
   // check response
   resp = mySerial.readString();
   if (resp.equals("\n\r\nOK\r\n")) {
-    Serial.print("PDP IP Address -> "); Serial.println(ip);
+    #if CT_BG96_DEBUG
+      Serial.print("PDP IP Address -> "); Serial.println(ip);
+    #endif
     return 0;
   }
 
@@ -206,7 +273,7 @@ int8_t showPdpAddr(void) {
 
 
 /* TCP/IP and UDP Commands ----------------- */
-int8_t configTCPcontext(uint8_t contextID, uint8_t contextType, String APN, String username, String password, uint8_t authen=0) {
+int8_t configTCPcontext(String APN, uint8_t contextID=1, uint8_t contextType=1, String username="", String password="", uint8_t authen=0) {
   String payload = "AT+QICSGP=";
   String resp    = "";
 
@@ -241,13 +308,16 @@ int8_t configTCPcontext(uint8_t contextID, uint8_t contextType, String APN, Stri
   resp = mySerial.readString(); // read response
 
   if (resp.equals("OK\r\n")) {
+    #if CT_BG96_DEBUG
+      Serial.println("TCP context configred");
+    #endif
     return 0;
   }
 
   return -1;
 }
 
-int8_t deactivatePDP(uint8_t contextID) {
+int8_t deactivatePDP(uint8_t contextID=1) {
   String payload = "AT+QIDEACT=";
   String resp    = "";
 
@@ -268,7 +338,7 @@ int8_t deactivatePDP(uint8_t contextID) {
   return -1;
 }
 
-int8_t activatePDP(uint8_t contextID, uint8_t contextState, uint8_t contextType) {
+int8_t activatePDP(uint8_t contextID=1, uint8_t contextState=1, uint8_t contextType=1) {
   String resp = "";
   String payload = "AT+QIACT=";
   
@@ -299,13 +369,16 @@ int8_t activatePDP(uint8_t contextID, uint8_t contextState, uint8_t contextType)
   resp = mySerial.readString(); // read response
 
   if (resp.equals("OK\r\n")) {
+    #if CT_BG96_DEBUG
+      Serial.println("PDP activated.");
+    #endif
     return 0;
   }
 
   return -1;
 }
 
-int8_t openSocketService(uint8_t contextID, uint8_t connectID, String serviceType, String ipAddr, uint16_t port) {
+int8_t openSocketService(String serviceType, String ipAddr, uint16_t port, uint8_t contextID=1, uint8_t connectID=0) {
   // AT+QIOPEN=1,0,"UDP","178.128.16.9",41234
   
   String payload  = "AT+QIOPEN=";
@@ -355,12 +428,16 @@ int8_t openSocketService(uint8_t contextID, uint8_t connectID, String serviceTyp
   err_code = mySerial.readString(); // read error code
 
   if (!err_code.equals("0\r\n")) {
-    Serial.print("Open socket error with error code -> ");
-    Serial.print(err_code);
+    #if CT_BG96_DEBUG
+      Serial.print("Open socket error with error code -> ");
+      Serial.print(err_code);
+    #endif
     return -1;
   }
   else {
-    Serial.println("Socket opening succeeded.");
+    #if CT_BG96_DEBUG
+      Serial.println("Socket opening succeeded.");
+    #endif
     return 0;
   }
 
@@ -369,7 +446,7 @@ int8_t openSocketService(uint8_t contextID, uint8_t connectID, String serviceTyp
 
 }
 
-int8_t closeSocketService(uint8_t connectID, uint16_t timeout=10) {
+int8_t closeSocketService(uint8_t connectID=0, uint16_t timeout=10) {
   String resp    = "";
   String payload = "AT+QICLOSE=";
 
@@ -392,7 +469,9 @@ int8_t closeSocketService(uint8_t connectID, uint16_t timeout=10) {
   resp = mySerial.readString();
 
   if (resp.equals("OK\r\n")) {
-    Serial.println("Socket closed.");
+    #if CT_BG96_DEBUG
+      Serial.println("Socket closed.");
+    #endif
     return 0;
   }
 
@@ -408,13 +487,18 @@ int8_t sendData(String data, uint8_t connectID=0) {
 
   /* Params Validation */
   if (connectID < 0 || connectID > 11) {
-    Serial.println("Cannot send. Invalid Connect ID. (must ranged from 0 to 11)");
+    #if CT_BG96_DEBUG
+      Serial.println("Cannot send. Invalid Connect ID. (must ranged from 0 to 11)");
+    #endif
     return -1;
   }
   payload += String(connectID) + ",";
 
   if (data_length > 1460) {
-    Serial.println("Cannot send because data length exceeds limit! (maximum 1460 bytes)");
+    #if CT_BG96_DEBUG
+      Serial.println("Cannot send because data length exceeds limit! (maximum 1460 bytes)");
+    #endif
+    return -1;
   }
   payload += String(data_length) + "\r\n";
 
@@ -428,17 +512,21 @@ int8_t sendData(String data, uint8_t connectID=0) {
   resp = mySerial.readString();
 
   if (resp.equals("ERROR\r\n")) {
-    Serial.println("Cannot send because socket is not opened.");
+    #if CT_BG96_DEBUG
+      Serial.println("Cannot send because socket is not opened.");
+    #endif
     return -1;
   }
   else if (resp.equals("> ")) {
     // Send Data
     mySerial.print(data);
-    mySerial.print(0x1A); // ctrl+z (in hex)
+    mySerial.print(0x1A); // ctrl+z (in hex) to terminate transmission
     mySerial.flush();
   }
   else {
-    Serial.println("Cannot send. Unexpected Error!");
+    #if CT_BG96_DEBUG
+      Serial.println("Cannot send. Unexpected Error!");
+    #endif
     return -1;
   }
 
@@ -450,15 +538,21 @@ int8_t sendData(String data, uint8_t connectID=0) {
   resp = mySerial.readString();
 
   if (resp.equals("SEND OK\r\n")) {
-    Serial.println("Send OK.");
+    #if CT_BG96_DEBUG
+      Serial.println("Send OK.");
+    #endif
     return 0;
   }
   else if (resp.equals("SEND FAIL\r\n")) {
-    Serial.println("Send Failed. Buffer is full!");
+    #if CT_BG96_DEBUG
+      Serial.println("Send Failed. Buffer is full!");
+    #endif
     return -1;
   }
   else {
-    Serial.println("Error! Connection has not established, abnormally closed or parameter is incorrect.");
+    #if CT_BG96_DEBUG
+      Serial.println("Error! Connection has not established, abnormally closed or parameter is incorrect.");
+    #endif
     return -1;
   }
 
@@ -470,7 +564,9 @@ int8_t pingServer(String host, uint8_t contextID=1, uint8_t timeout=4) {
   String  payload = "AT+QPING=";
   uint8_t pingnum = 1;
   
-  Serial.println("Pinging to \"" + host + "\"");
+  #if CT_BG96_DEBUG
+    Serial.println("Pinging to \"" + host + "\"");
+  #endif
 
   // set timeout of serial to match ping timeout
   mySerial.setTimeout((int32_t) timeout * 1000);
@@ -478,7 +574,9 @@ int8_t pingServer(String host, uint8_t contextID=1, uint8_t timeout=4) {
   /* Params Validation */
   // check context id
   if (contextID < 1 || contextID > 16) {
-    Serial.println("Error, cannot ping the target host. Invalid context id");
+    #if CT_BG96_DEBUG
+      Serial.println("Error, cannot ping the target host. Invalid context id");
+    #endif
     return -1;
   }
   payload += String(contextID) + ",";
@@ -488,14 +586,18 @@ int8_t pingServer(String host, uint8_t contextID=1, uint8_t timeout=4) {
 
   // check timeout
   if (timeout < 1 || timeout > 255) {
-    Serial.println("Error, cannot ping the target host. Invalid timeout");
+    #if CT_BG96_DEBUG
+      Serial.println("Error, cannot ping the target host. Invalid timeout");
+    #endif
     return -1;
   }
   payload += String(timeout) + ",";
 
   // check pingnum
   if (pingnum < 1 || pingnum > 10) {
-    Serial.println("Error, cannot ping the target host. Invalid ping number");
+    #if CT_BG96_DEBUG
+      Serial.println("Error, cannot ping the target host. Invalid ping number");
+    #endif
     return -1;
   }
   payload += String(pingnum) + "\r\n";
@@ -510,7 +612,9 @@ int8_t pingServer(String host, uint8_t contextID=1, uint8_t timeout=4) {
   resp = mySerial.readStringUntil('\n'); // read response
 
   if (!resp.equals("OK\r")) {
-    Serial.println("Error! Cannot ping the target server.");
+    #if CT_BG96_DEBUG
+      Serial.println("Error! Cannot ping the target server.");
+    #endif
     return -1;
   }
   mySerial.readStringUntil('\n'); // read remaining "\r\n"
@@ -519,21 +623,24 @@ int8_t pingServer(String host, uint8_t contextID=1, uint8_t timeout=4) {
   mySerial.readStringUntil(' ');  // discard header
   String finresult = mySerial.readStringUntil(',');
   if (!finresult.equals("0")) {
-    Serial.print("Ping Final Result wasn't finished normally with error code -> ");
-    Serial.print(finresult);
+    #if CT_BG96_DEBUG
+      Serial.print("Ping Final Result wasn't finished normally with error code -> ");
+      Serial.print(finresult);
+    #endif
     return -1;
   }
 
   // bytes, resp time, ttl
   mySerial.readStringUntil(','); // discard ip
   String bytes = mySerial.readStringUntil(','); // read number of bytes used for ping
-  String time  = mySerial.readStringUntil(','); // read response time (ms)
+  String rtt  = mySerial.readStringUntil(','); // read response time (ms)
   String ttl   = mySerial.readStringUntil('\r'); // read time to live
   mySerial.readString(); // discard the rest in the buffer
 
-  Serial.println("Number of Bytes sent -> " + bytes + ", Response time -> " + \
-  time + "ms, ttl -> " + ttl);
-
+  #if CT_BG96_DEBUG
+    Serial.println("Number of Bytes sent -> " + bytes + ", rtt -> " + \
+    rtt + "ms, ttl -> " + ttl);
+  #endif
   mySerial.setTimeout(1000); // set timeout back to 1 sec
   
   return 0;
@@ -541,9 +648,3 @@ int8_t pingServer(String host, uint8_t contextID=1, uint8_t timeout=4) {
 
 
 
-
-
-/*
-   TODO
-1. Buffer overflow problem, may need to disable echo 
-*/
