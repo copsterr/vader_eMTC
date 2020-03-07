@@ -17,6 +17,9 @@ void setup() {
   if (configTCPcontext(1, 1, "aistest.emtc", "", "", 0) == 0) Serial.println("config TCP context ok.");
   if (deactivatePDP(1) == 0) Serial.println("PDP deactivated.");
   if (activatePDP(1, 1, 1) == 0) Serial.println("PDP activated.");
+
+  openSocketService(1,0,"UDP","178.128.16.9",41234);
+  closeSocketService(0);
 }
 
 

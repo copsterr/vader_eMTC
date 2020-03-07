@@ -182,7 +182,7 @@ int8_t showPdpAddr(void) {
 
 
 /* TCP/IP and UDP Commands ----------------- */
-int8_t configTCPcontext(uint8_t contextID, uint8_t contextType, String APN, String username, String password, uint8_t authen) {
+int8_t configTCPcontext(uint8_t contextID, uint8_t contextType, String APN, String username, String password, uint8_t authen=0) {
   String payload = "AT+QICSGP=";
   String resp    = "";
 
@@ -284,8 +284,9 @@ int8_t activatePDP(uint8_t contextID, uint8_t contextState, uint8_t contextType)
 int8_t openSocketService(uint8_t contextID, uint8_t connectID, String serviceType, String ipAddr, uint16_t port) {
   // AT+QIOPEN=1,0,"UDP","178.128.16.9",41234
   
-  String payload = "AT+QIOPEN=";
-  String resp    = "";
+  String payload  = "AT+QIOPEN=";
+  String resp     = "";
+  String err_code = "";
 
   /* Params Validation */
   // check context id
@@ -294,10 +295,83 @@ int8_t openSocketService(uint8_t contextID, uint8_t connectID, String serviceTyp
   else
     payload += String(contextID) + ",";
 
-  // check context type
+  // check connect id
+  if (connectID < 0 || connectID > 11)
+    return -1;
+  else
+    payload += String(connectID) + ",";
+  
+  // check service type
+  if (serviceType.equals("TCP") || serviceType.equals("UDP") || \
+      serviceType.equals("TCP LISTENER") || serviceType.equals("UDP SERVICE")) {
+    payload += "\"" + serviceType + "\",";
+  }
 
+  // check ip
+  payload += "\"" + ipAddr + "\",";
+
+  // add remote port
+  payload += String(port) + "\r\n";
+
+  
+  /* write command */
+  mySerial.print(payload);
+  mySerial.flush();
+
+
+  /* read response */
+  mySerial.readStringUntil('\n'); // read echo
+  resp = mySerial.readStringUntil('\n');
+
+  if (resp.equals("ERROR\r")) {
+    return -1; // error occurs
+  }
+
+  mySerial.readStringUntil(','); // read message header til ','
+  err_code = mySerial.readString(); // read error code
+
+  if (!err_code.equals("0\r\n")) {
+    Serial.print("Open socket error with error code -> ");
+    Serial.print(err_code);
+    return -1;
+  }
+  else {
+    Serial.println("Socket opening succeeded.");
+    return 0;
+  }
+
+  return -1;
 
 
 }
 
+int8_t closeSocketService(uint8_t connectID, uint16_t timeout=10) {
+  String resp    = "";
+  String payload = "AT+QICLOSE=";
 
+  /* Params Validation */
+  if (connectID < 0 || connectID > 11)
+    return -1;
+  payload += String(connectID) + ",";
+  
+  if (timeout < 0 || timeout > 65535)
+    return -1;
+  payload += String(timeout) + "\r\n";
+
+
+  /* write command */
+  mySerial.print(payload);
+  mySerial.flush();
+
+  /* read response */
+  mySerial.readStringUntil('\n'); // read echo
+  resp = mySerial.readString();
+
+  if (resp.equals("OK\r\n")) {
+    Serial.println("Socket closed.");
+    return 0;
+  }
+
+  return -1;
+  
+}
