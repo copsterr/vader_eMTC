@@ -17,7 +17,6 @@ int8_t initModule(void) {
   mySerial.setTimeout(1000);
 }
 
-
 int8_t checkModule(void) {
   String resp = "";
   
@@ -31,6 +30,31 @@ int8_t checkModule(void) {
   }
 
   return -1; // error
+}
+
+int8_t configEcho(uint8_t mode=0) {
+  String resp    = "";
+  String payload = "ATE";
+
+  if (mode != 0 || mode != 1) {
+    Serial.println("Cannot set Echo. Invalid Parameter");
+    return -1;
+  }
+  payload += String(mode) + "\r\n";
+
+  /* write command */
+  mySerial.print(payload);
+
+  /* read response */
+  mySerial.readStringUntil('\n'); // read echo
+  resp = mySerial.readString();
+
+  if (resp.equals("OK\r\n")) {
+    return 0;
+  }
+  
+  return -1;
+
 }
 
 int8_t requestIMEI(void) {
@@ -375,3 +399,77 @@ int8_t closeSocketService(uint8_t connectID, uint16_t timeout=10) {
   return -1;
   
 }
+
+int8_t sendData(String data, uint8_t connectID=0) {
+  /* Maximum data length is 1460 bytes */
+  uint16_t data_length = data.length(); // plus an ETB byte
+  String payload     = "AT+QISEND=";
+  String resp        = "";
+
+  /* Params Validation */
+  if (connectID < 0 || connectID > 11) {
+    Serial.println("Cannot send. Invalid Connect ID. (must ranged from 0 to 11)");
+    return -1;
+  }
+  payload += String(connectID) + ",";
+
+  if (data_length > 1460) {
+    Serial.println("Cannot send because data length exceeds limit! (maximum 1460 bytes)");
+  }
+  payload += String(data_length) + "\r\n";
+
+  
+  /* write command */
+  mySerial.print(payload);
+  mySerial.flush();
+
+  /* read response */
+  mySerial.readStringUntil('\n'); // read echo
+  resp = mySerial.readString();
+
+  if (resp.equals("ERROR\r\n")) {
+    Serial.println("Cannot send because socket is not opened.");
+    return -1;
+  }
+  else if (resp.equals("> ")) {
+    // Send Data
+    mySerial.print(data);
+    mySerial.print(0x1A); // ctrl+z (in hex)
+    mySerial.flush();
+  }
+  else {
+    Serial.println("Cannot send. Unexpected Error!");
+    return -1;
+  }
+
+  /* read send response */
+  // read echo data from the module
+  mySerial.readStringUntil('\n');
+
+  // read response
+  resp = mySerial.readString();
+
+  if (resp.equals("SEND OK\r\n")) {
+    Serial.println("Send OK.");
+    return 0;
+  }
+  else if (resp.equals("SEND FAIL\r\n")) {
+    Serial.println("Send Failed. Buffer is full!");
+    return -1;
+  }
+  else {
+    Serial.println("Error! Connection has not established, abnormally closed or parameter is incorrect.");
+    return -1;
+  }
+
+  return -1;
+}
+
+
+
+
+
+/*
+   TODO
+1. Buffer overflow problem, may need to disable echo 
+*/

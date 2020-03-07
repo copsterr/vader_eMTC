@@ -19,7 +19,9 @@ void setup() {
   if (activatePDP(1, 1, 1) == 0) Serial.println("PDP activated.");
 
   openSocketService(1,0,"UDP","178.128.16.9",41234);
+  sendData("hello world");
   closeSocketService(0);
+  
 }
 
 
