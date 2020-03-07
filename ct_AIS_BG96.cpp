@@ -465,6 +465,80 @@ int8_t sendData(String data, uint8_t connectID=0) {
   return -1;
 }
 
+int8_t pingServer(String host, uint8_t contextID=1, uint8_t timeout=4) {
+  String  resp    = "";
+  String  payload = "AT+QPING=";
+  uint8_t pingnum = 1;
+  
+  Serial.println("Pinging to \"" + host + "\"");
+
+  // set timeout of serial to match ping timeout
+  mySerial.setTimeout((int32_t) timeout * 1000);
+
+  /* Params Validation */
+  // check context id
+  if (contextID < 1 || contextID > 16) {
+    Serial.println("Error, cannot ping the target host. Invalid context id");
+    return -1;
+  }
+  payload += String(contextID) + ",";
+
+  // add host
+  payload += "\"" + String(host) + "\",";
+
+  // check timeout
+  if (timeout < 1 || timeout > 255) {
+    Serial.println("Error, cannot ping the target host. Invalid timeout");
+    return -1;
+  }
+  payload += String(timeout) + ",";
+
+  // check pingnum
+  if (pingnum < 1 || pingnum > 10) {
+    Serial.println("Error, cannot ping the target host. Invalid ping number");
+    return -1;
+  }
+  payload += String(pingnum) + "\r\n";
+
+  
+  /* write command */
+  mySerial.print(payload);
+  mySerial.flush();
+
+  /* read response */
+  mySerial.readStringUntil('\n');  // read echo
+  resp = mySerial.readStringUntil('\n'); // read response
+
+  if (!resp.equals("OK\r")) {
+    Serial.println("Error! Cannot ping the target server.");
+    return -1;
+  }
+  mySerial.readStringUntil('\n'); // read remaining "\r\n"
+
+  // read ping result
+  mySerial.readStringUntil(' ');  // discard header
+  String finresult = mySerial.readStringUntil(',');
+  if (!finresult.equals("0")) {
+    Serial.print("Ping Final Result wasn't finished normally with error code -> ");
+    Serial.print(finresult);
+    return -1;
+  }
+
+  // bytes, resp time, ttl
+  mySerial.readStringUntil(','); // discard ip
+  String bytes = mySerial.readStringUntil(','); // read number of bytes used for ping
+  String time  = mySerial.readStringUntil(','); // read response time (ms)
+  String ttl   = mySerial.readStringUntil('\r'); // read time to live
+  mySerial.readString(); // discard the rest in the buffer
+
+  Serial.println("Number of Bytes sent -> " + bytes + ", Response time -> " + \
+  time + "ms, ttl -> " + ttl);
+
+  mySerial.setTimeout(1000); // set timeout back to 1 sec
+  
+  return 0;
+}
+
 
 
 

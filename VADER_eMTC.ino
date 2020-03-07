@@ -20,6 +20,7 @@ void setup() {
 
   openSocketService(1,0,"UDP","178.128.16.9",41234);
   sendData("hello world");
+  pingServer("178.128.16.9");
   closeSocketService(0);
   
 }
