@@ -74,25 +74,41 @@ init_status_t initModule(void) {
   return INIT_STATUS_OK;
 }
 
-int8_t openConnection(String APN, String serviceType, String ipAddr, uint16_t port) {
+connect_status_t openConnection(String APN, String serviceType, String ipAddr, uint16_t port) {
   uint8_t ret = 0;
 
-  if (configTCPcontext(APN) != 0) ret = -1;
-  if (deactivatePDP() != 0) ret = -1;
-  if (activatePDP() != 0) ret = -1;
-  if (openSocketService(serviceType, ipAddr, port) != 0) ret = -1;
-  
-  if (ret == -1) {
+  if (configTCPcontext(APN) != 0) {
     #if CT_BG96_DEBUG
-      Serial.println("Error! Cannot open connection!");
+      Serial.println("Error! Can't set TCP context!");
     #endif
-    return ret;
+    return CONNECT_STATUS_TCP_ERR;
+  }
+
+  if (deactivatePDP() != 0) {
+    #if CT_BG96_DEBUG
+      Serial.println("Error! Can't deactivate PDP!");
+    #endif
+    return CONNECT_STATUS_DEACT_ERR;
+  }
+
+  if (activatePDP() != 0) {
+    #if CT_BG96_DEBUG
+      Serial.println("Error! Can't activate PDP!");
+    #endif
+    return CONNECT_STATUS_ACT_ERR;
+  }
+
+  if (openSocketService(serviceType, ipAddr, port) != 0) {
+    #if CT_BG96_DEBUG
+      Serial.println("Error! Can't open socket!");
+    #endif
+    return CONNECT_STATUS_OPENSOC_ERR;
   }
 
   #if CT_BG96_DEBUG
     Serial.println("Socket Opened Successfully.");
   #endif
-  return 0;
+  return CONNECT_STATUS_OK;
 }
 
 

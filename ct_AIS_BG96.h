@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <AltSoftSerial.h>
 
-#define CT_BG96_DEBUG 1 // Debug switch
+#define CT_BG96_DEBUG 0 // Debug switch
 
 /* Prototypes */
 void printSerialDebug(void);
@@ -18,10 +18,18 @@ typedef enum {
     INIT_STATUS_UNKNOWN_ERR = -1
 } init_status_t;
 
+typedef enum {
+    CONNECT_STATUS_OK = 0x00,
+    CONNECT_STATUS_TCP_ERR,
+    CONNECT_STATUS_DEACT_ERR,
+    CONNECT_STATUS_ACT_ERR,
+    CONNECT_STATUS_OPENSOC_ERR,
+    CONNECT_STATUS_UNKNOWN_ERR = -1
+} connect_status_t;
 
 ////////////////////////// HIGH LEVEL FUNCTIONS ////////////////////////////////
 init_status_t initModule(void);
-int8_t openConnection(String APN, String serviceType, String ipAddr, uint16_t port);
+connect_status_t openConnection(String APN, String serviceType, String ipAddr, uint16_t port);
 
 /////////////////////////////// AT COMMANDS ////////////////////////////////////
 /* General Commands ----------------- */
