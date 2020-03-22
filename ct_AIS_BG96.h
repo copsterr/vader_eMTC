@@ -6,8 +6,21 @@
 /* Prototypes */
 void printSerialDebug(void);
 
+typedef enum {
+    INIT_STATUS_OK = 0x00,
+    INIT_STATUS_CHECK_ERR,
+    INIT_STATUS_ECHO_ERR,
+    INIT_STATUS_REQIMEI_ERR,
+    INIT_STATUS_SETPHONE_ERR,
+    INIT_STATUS_SIGREP_ERR,
+    INIT_STATUS_CGATT_ERR,
+    INIT_STATUS_SHOWADDR_ERR,
+    INIT_STATUS_UNKNOWN_ERR = -1
+} init_status_t;
+
+
 ////////////////////////// HIGH LEVEL FUNCTIONS ////////////////////////////////
-int8_t initModule(void);
+init_status_t initModule(void);
 int8_t openConnection(String APN, String serviceType, String ipAddr, uint16_t port);
 
 /////////////////////////////// AT COMMANDS ////////////////////////////////////

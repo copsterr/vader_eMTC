@@ -17,6 +17,8 @@ void setup() {
 
 
 void loop() {
-  pingServer("178.128.16.9");
+  if (pingServer("178.128.16.9") == 0) {
+    Serial.println("Ping success");
+  };
   delay(5000);
 }

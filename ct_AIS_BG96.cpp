@@ -12,32 +12,66 @@ void printSerialDebug(void) {
 }
 
 /* HIGH LEVEL FUNCTIONS */
-int8_t initModule(void) {
+init_status_t initModule(void) {
   uint8_t ret = 0;
   
   mySerial.begin(9600);
   mySerial.setTimeout(1000);
 
-  if (checkModule() != 0) ret = -1;
-  if (configEcho() != 0) ret = -1;
-  if (requestIMEI() != 0) ret = -1;
-  if (setPhoneFunc() != 0) ret = -1;
-  if (signalQualityReport() != 0) ret = -1;
-  if (cgatt(1) != 0) ret = -1;
-  if (showPdpAddr() != 0) ret = -1;
-  
-  if (ret == -1) {
+  if (checkModule() != 0) {
     #if CT_BG96_DEBUG
-      Serial.println("Error! Cannot init Module!");
+      Serial.println("Error! Module not responded!");
     #endif
-    return ret;
+    return INIT_STATUS_CHECK_ERR;
+  }
+
+  if (configEcho() != 0) {
+    #if CT_BG96_DEBUG
+      Serial.println("Error! Cannot set echo command!");
+    #endif
+    return INIT_STATUS_ECHO_ERR;
+  }
+
+  if (requestIMEI() != 0) {
+    #if CT_BG96_DEBUG
+      Serial.println("Error! Cannot request IMEI!");
+    #endif
+    return INIT_STATUS_REQIMEI_ERR;
+  }
+
+  if (setPhoneFunc() != 0) {
+    #if CT_BG96_DEBUG
+      Serial.println("Error! Cannot set phone!");
+    #endif
+    return INIT_STATUS_SETPHONE_ERR;
+  }
+  
+  if (signalQualityReport() != 0) {
+    #if CT_BG96_DEBUG
+      Serial.println("Error! Cannot read Signal Quality Report!");
+    #endif
+    return INIT_STATUS_SIGREP_ERR;
+  }
+  
+  if (cgatt(1) != 0) {
+    #if CT_BG96_DEBUG
+      Serial.println("Error! Cannot CGATT!");
+    #endif
+    return INIT_STATUS_CGATT_ERR;
+  }
+  
+  if (showPdpAddr() != 0) {
+    #if CT_BG96_DEBUG
+      Serial.println("Error! Cannot show Address!");
+    #endif
+    return INIT_STATUS_SHOWADDR_ERR;
   }
   
   #if CT_BG96_DEBUG
     Serial.println("AIS eMTC BG96 Module successfully initialized.");
   #endif
 
-  return ret;
+  return INIT_STATUS_OK;
 }
 
 int8_t openConnection(String APN, String serviceType, String ipAddr, uint16_t port) {
