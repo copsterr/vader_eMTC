@@ -3,6 +3,8 @@
 #include "PMS.h"
 #include <ThreeWire.h>  
 #include <RtcDS1302.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 
 /* Private Defines -------------- */
 #define APN               "aistest.emtc"
@@ -28,6 +30,12 @@ uint32_t prevMillis = millis();
 connect_status_t connect_status = CONNECT_STATUS_UNKNOWN_ERR;
 uint8_t pingCount = 0;
 #define DUTY_CYCLE 5000
+
+// LCD Vars
+LiquidCrystal_I2C lcd(0x3f, 16, 2); // Set the LCD address to 0x27 for a 16 chars and 2 line display
+
+// gnss vars
+gnss_data_t gnss;
 
 
 void setup() {
@@ -71,7 +79,32 @@ void setup() {
   // init PMS Serial port
   Serial1.begin(9600);
   
+  // start GNSS
+  if (GNSS() == GNSS_OK) {
+    Serial.println("GNSS started.");
+  }
+  else {
+    Serial.println("Ending GNSS...");
+    if (GNSS_end() == GNSS_OK) {
+      GNSS();
+      Serial.println("GNSS started.");
+    } else {
+      Serial.println("Something wrong with GNSS.");
+    }
+  }
 
+  #if USE_LCD
+  /* Setup LCD -------------------- */
+    // initialize the LCD
+    lcd.begin();
+
+    // Turn on the blacklight and print a message.
+    lcd.backlight();
+    lcd.print("Starting NB-IoT...");
+  #endif
+
+  // Start RTC
+  Rtc.Begin();
 }
 
 
@@ -79,10 +112,6 @@ void loop() {
   
   if (pms.read(pmsData))
   {
-//    Serial.println(pmsData.PM_AE_UG_1_0);
-//    Serial.println(pmsData.PM_AE_UG_2_5);
-//    Serial.println(pmsData.PM_AE_UG_10_0);
-
     // Ping to check connection with the remote server
     while (pingCount < PING_ATTEMPTS_MAX) {
       if (pingServer("178.128.16.9") != 0) {
@@ -113,18 +142,31 @@ void loop() {
             now.Hour(),
             now.Minute(),
             now.Second());
-
+    
+    // get gnss data
+    if (GNSS_getLoc(&gnss) != GNSS_OK) {
+      gnss.lat = "";
+      gnss.lng = "";
+    }
 
     String payload = "{\"dev_id\":\"" + String(DEV_ID) + \
                      "\",\"type\":\"PM\",\"timestamp\":\"" + String(timePayload) + \
                      "\",\"PM1_0\":" + String(pmsData.PM_AE_UG_1_0) + \
                      ",\"PM2_5\":" + String(pmsData.PM_AE_UG_2_5) + \
                      ",\"PM10_0\":" + String(pmsData.PM_AE_UG_10_0) + \
-                     ",\"Lat\":" + "" + \
-                     ",\"Lng\":" + "" + "}";
+                     ",\"Lat\":" + gnss.lat + \
+                     ",\"Lng\":" + gnss.lng + "}";
+
+    #if USE_LCD
+        lcd.clear(); lcd.setCursor(0, 0);
+        lcd.print("PM1:" + String(pmsData.PM_AE_UG_1_0) + " PM2.5:" + String(pmsData.PM_AE_UG_2_5));
+        lcd.setCursor(0, 1);
+        lcd.print("PM10:" + String(pmsData.PM_AE_UG_10_0));
+    #endif
 
     // transmit data
-    if (millis() - prevMillis > DUTY_CYCLE) {
+    if (millis() - prevMillis >= DUTY_CYCLE) {
+      Serial.println("transmitting data...");
       sendData(payload);
       prevMillis = millis();
     }

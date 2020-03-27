@@ -2,8 +2,8 @@
 
 AltSoftSerial mySerial;
 
-/* User Defined Functions ---------- */
-void printSerialDebug(void) {
+
+static void printSerialDebug(void) {
   delay(1000);
   while (mySerial.available()) {
     Serial.print(mySerial.read(), HEX);
@@ -148,6 +148,7 @@ int8_t configEcho(uint8_t mode=0) {
 
   /* write command */
   mySerial.print(payload);
+  mySerial.flush();
 
   /* read response */
   mySerial.readStringUntil('\n'); // read echo
@@ -697,4 +698,91 @@ int8_t pingServer(String host, uint8_t contextID=1, uint8_t timeout=4) {
 }
 
 
+/* GNSS COMMANDS */
+gnss_t GNSS(void) 
+{
+  String resp = "";
+  
+  mySerial.write("AT+QGPS=1\r\n");
+  mySerial.flush();
 
+  mySerial.readStringUntil('\n'); // read echo
+  resp = mySerial.readString(); // read response
+  
+  if (resp.equals("OK\r\n") == true) {
+    return GNSS_OK; // success
+  }
+
+  return GNSS_ERROR; // error
+}
+
+gnss_t GNSS_end(void)
+{
+  String resp = "";
+
+  mySerial.write("AT+QGPSEND\r\n");
+  mySerial.flush();
+
+  mySerial.readStringUntil('\n'); // read echo
+  resp = mySerial.readString();
+
+  if (resp.equals("OK\r\n") == true) {
+    return GNSS_OK; // success
+  }
+
+  return GNSS_ERROR; // error
+}
+
+gnss_t GNSS_getLoc(gnss_data_t* gnss)
+{
+  String resp = "";
+  
+  mySerial.write("AT+QGPSLOC=2\r\n");
+  mySerial.flush();
+
+  mySerial.readStringUntil('\n'); // read echo
+  resp = mySerial.readStringUntil(' ');
+
+  if (resp.equals("+CME ERROR:")) {
+    resp = mySerial.readString();
+    Serial.println("ERROR Getting Location with error code: " + resp);
+    return GNSS_ERROR;
+  }
+  else if (resp.equals("+QGPSLOC:")) {
+    // +QGPSLOC: 133112.0,13.99486,99.99547,0.5,17.0,2,140.12,0.0,0.0,250320,10
+    String utc = "";
+    String lat = "";
+    String lng = "";
+    String alt = "";
+    String spkm = "";
+    String date = "";
+    String nsat = "";
+
+    utc = mySerial.readStringUntil(',');
+    lat = mySerial.readStringUntil(',');
+    lng = mySerial.readStringUntil(',');
+    mySerial.readStringUntil(','); //dhop
+    alt = mySerial.readStringUntil(',');
+    mySerial.readStringUntil(','); //fix
+    mySerial.readStringUntil(','); // cog
+    spkm = mySerial.readStringUntil(',');
+    mySerial.readStringUntil(','); // spkn
+    date = mySerial.readStringUntil(',');
+    nsat = mySerial.readStringUntil('\r');
+    mySerial.readString(); // flush all the data left in the buffer
+
+    // assign values into gnss struct
+    gnss->utc = utc;
+    gnss->lat = lat;
+    gnss->lng = lng;
+    gnss->alt = alt;
+    gnss->spkm = spkm;
+    gnss->date = date;
+    gnss->nsat = nsat;
+
+    return GNSS_OK;
+  }
+
+  Serial.println("Some error occurred! Cannot get Location Data from GNSS!");
+  return GNSS_ERROR;
+}

@@ -1,11 +1,14 @@
+// Include Guards
+#ifndef CT_AIS_BG96_H
+#define CT_AIS_BG96_H
+
+
 #include <Arduino.h>
 #include <AltSoftSerial.h>
 
 #define CT_BG96_DEBUG 0 // Debug switch
 
-/* Prototypes */
-void printSerialDebug(void);
-
+/* Enums */
 typedef enum {
     INIT_STATUS_OK = 0x00,
     INIT_STATUS_CHECK_ERR,
@@ -26,6 +29,27 @@ typedef enum {
     CONNECT_STATUS_OPENSOC_ERR,
     CONNECT_STATUS_UNKNOWN_ERR = -1
 } connect_status_t;
+
+typedef enum {
+  GNSS_OK = 0x00,
+  GNSS_INVALID_PARAMS,
+  GNSS_ERROR,
+  GNSS_UNKNOWN_ERROR
+} gnss_t;
+
+typedef struct gnss_data {
+  String utc = "";
+  String lat = "";
+  String lng = "";
+  String alt = "";
+  String spkm = "";
+  String date = "";
+  String nsat = "";
+} gnss_data_t;
+
+/* Prototypes */
+static void printSerialDebug(void);
+
 
 ////////////////////////// HIGH LEVEL FUNCTIONS ////////////////////////////////
 init_status_t initModule(void);
@@ -49,3 +73,10 @@ int8_t openSocketService(String serviceType, String ipAddr, uint16_t port, uint8
 int8_t closeSocketService(uint8_t connectID=0, uint16_t timeout=10);
 int8_t sendData(String data, uint8_t connectID=0);
 int8_t pingServer(String host, uint8_t contextID=1, uint8_t timeout=4);
+
+/* gnss command */
+gnss_t GNSS(void);
+gnss_t GNSS_end(void);
+gnss_t GNSS_getLoc(gnss_data_t* gnss);
+
+#endif
