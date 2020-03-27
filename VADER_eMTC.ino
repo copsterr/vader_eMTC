@@ -29,7 +29,7 @@ RtcDS1302<ThreeWire> Rtc(myWire);
 uint32_t prevMillis = millis();
 connect_status_t connect_status = CONNECT_STATUS_UNKNOWN_ERR;
 uint8_t pingCount = 0;
-#define DUTY_CYCLE 5000
+#define DUTY_CYCLE 3000
 
 // LCD Vars
 LiquidCrystal_I2C lcd(0x3f, 16, 2); // Set the LCD address to 0x27 for a 16 chars and 2 line display
@@ -44,8 +44,23 @@ void setup() {
   
   Serial.println("\r\n########## AIS eMTC Started! ##########");
 
+  #if USE_LCD
+  /* Setup LCD -------------------- */
+    // initialize the LCD
+    lcd.begin();
+
+    // Turn on the blacklight and print a message.
+    lcd.backlight();
+    lcd.print("Starting eMTC...");
+  #endif
+
   // Init eMTC Shield
-  if (initModule() != INIT_STATUS_OK) resetArduino();
+  if (initModule() != INIT_STATUS_OK) {
+    Serial.println("Cannot init module. Restarting arduino!");
+    delay(3000);
+    resetArduino();
+  }
+  
 
   // Keep open connection until it's successful
   Serial.print("Opening Connection");
@@ -58,9 +73,25 @@ void setup() {
     delay(2000);
   } while (connect_status != CONNECT_STATUS_OK);
 
+  #if USE_LCD 
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Completed.");
+  #endif
+  
+
   // Ping to check connection with the remote server
   while (pingCount < PING_ATTEMPTS_MAX) {
     if (pingServer("178.128.16.9") != 0) {
+
+      #if USE_LCD 
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Ping Failed!");
+        lcd.setCursor(0, 1);
+        lcd.print("Reconnecting...");
+      #endif
+      
       Serial.println("Ping Error! Re-pinging...");
       pingCount++;
       delay(2000);
@@ -68,16 +99,41 @@ void setup() {
     else {
       pingCount = 0;
       Serial.println("Ping Success!");
+
+      #if USE_LCD 
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Ping Success!");
+        delay(1000);
+      #endif
+      
       break;
     }
   }
   if (pingCount == 3) {
+
+      #if USE_LCD 
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Bad Connection");
+        lcd.setCursor(0, 1);
+        lcd.print("Resetting...");
+        delay(1000);
+      #endif
+      
     Serial.println("Connection Failed.");
     resetArduino();
   }
 
   // init PMS Serial port
   Serial1.begin(9600);
+
+  #if USE_LCD 
+     lcd.clear();
+     lcd.setCursor(0, 0);
+     lcd.print("Starting GNSS");
+     delay(1000);
+   #endif
   
   // start GNSS
   if (GNSS() == GNSS_OK) {
@@ -88,23 +144,31 @@ void setup() {
     if (GNSS_end() == GNSS_OK) {
       GNSS();
       Serial.println("GNSS started.");
+
+      #if USE_LCD 
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("GNSS started.");
+        delay(1000);
+      #endif
+      
     } else {
       Serial.println("Something wrong with GNSS.");
+
+      #if USE_LCD 
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("GNSS failed.");
+        delay(1000);
+      #endif
     }
   }
 
-  #if USE_LCD
-  /* Setup LCD -------------------- */
-    // initialize the LCD
-    lcd.begin();
-
-    // Turn on the blacklight and print a message.
-    lcd.backlight();
-    lcd.print("Starting NB-IoT...");
-  #endif
-
   // Start RTC
   Rtc.Begin();
+
+  // clear lcd before starting any routine
+  lcd.clear();
 }
 
 
@@ -126,6 +190,15 @@ void loop() {
       }
     }
     if (pingCount == 3) {
+      #if USE_LCD 
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Bad Connection");
+        lcd.setCursor(0, 1);
+        lcd.print("Resetting...");
+        delay(1000);
+      #endif
+      
       Serial.println("Connection Failed.");
       resetArduino();
     }
@@ -169,9 +242,10 @@ void loop() {
       Serial.println("transmitting data...");
       sendData(payload);
       prevMillis = millis();
+      payload = ""; // clear payload
     }
-    
   }
+
 }
 
 
