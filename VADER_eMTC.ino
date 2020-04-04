@@ -74,8 +74,7 @@ void setup() {
   } while (connect_status != CONNECT_STATUS_OK);
 
   #if USE_LCD 
-    lcd.clear();
-    lcd.setCursor(0, 0);
+    lcd.setCursor(0, 1);
     lcd.print("Completed.");
   #endif
   
@@ -138,6 +137,12 @@ void setup() {
   // start GNSS
   if (GNSS() == GNSS_OK) {
     Serial.println("GNSS started.");
+
+    #if USE_LCD 
+     lcd.setCursor(0, 1);
+     lcd.print("GNSS Started");
+     delay(1000);
+   #endif
   }
   else {
     Serial.println("Ending GNSS...");
@@ -146,8 +151,7 @@ void setup() {
       Serial.println("GNSS started.");
 
       #if USE_LCD 
-        lcd.clear();
-        lcd.setCursor(0, 0);
+        lcd.setCursor(0, 1);
         lcd.print("GNSS started.");
         delay(1000);
       #endif
@@ -156,7 +160,6 @@ void setup() {
       Serial.println("Something wrong with GNSS.");
 
       #if USE_LCD 
-        lcd.clear();
         lcd.setCursor(0, 0);
         lcd.print("GNSS failed.");
         delay(1000);
@@ -168,6 +171,7 @@ void setup() {
   Rtc.Begin();
 
   // clear lcd before starting any routine
+  delay(2000);
   lcd.clear();
 }
 
